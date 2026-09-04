@@ -1,0 +1,240 @@
+// hooks/useCourses.ts
+// ============================================
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
+export type Course = {
+  id: string;
+  title: string;
+  term: string | null;
+  syllabus_raw_text: string | null;
+  created_at: string;
+};
+
+export function useCourses() {
+  const supabase = createClient();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) setError(error.message);
+    else setCourses(data ?? []);
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  async function createCourse(title: string, term?: string) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('courses')
+      .insert({ title, term, user_id: user.id })
+      .select()
+      .single();
+
+    if (error) throw error;
+    setCourses((prev) => [data, ...prev]);
+    return data;
+  }
+
+  async function deleteCourse(id: string) {
+    const { error } = await supabase.from('courses').delete().eq('id', id);
+    if (error) throw error;
+    setCourses((prev) => prev.filter((c) => c.id !== id));
+  }
+
+  return { courses, loading, error, createCourse, deleteCourse, refetch: fetchCourses };
+}
+
+
+// ============================================
+// hooks/useAssignments.ts
+// ============================================
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import type { CardItem } from '@/components/kanban/Board';
+
+export function useAssignments(courseId: string) {
+  const supabase = createClient();
+  const [assignments, setAssignments] = useState<CardItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAssignments = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('id, title, status, estimated_hours')
+      .eq('course_id', courseId)
+      .order('created_at', { ascending: true });
+
+    if (error) setError(error.message);
+    else setAssignments(data ?? []);
+    setLoading(false);
+  }, [supabase, courseId]);
+
+  useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments]);
+
+  // Realtime: keep board in sync if edited elsewhere (e.g. AI breakdown route)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`assignments-${courseId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'assignments', filter: `course_id=eq.${courseId}` },
+        () => fetchAssignments()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, courseId, fetchAssignments]);
+
+  async function createAssignment(title: string, description?: string) {
+    const { data, error } = await supabase
+      .from('assignments')
+      .insert({ course_id: courseId, title, description, status: 'todo' })
+      .select()
+      .single();
+
+    if (error) throw error;
+    setAssignments((prev) => [...prev, data]);
+    return data;
+  }
+
+  async function updateStatus(id: string, status: string) {
+    // optimistic update
+    setAssignments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+
+    const { error } = await supabase.from('assignments').update({ status }).eq('id', id);
+    if (error) {
+      setError(error.message);
+      fetchAssignments(); // revert on failure
+    }
+  }
+
+  async function requestBreakdown(id: string) {
+    const res = await fetch(`/api/assignments/${id}/breakdown`, { method: 'POST' });
+    if (!res.ok) {
+      const body = await res.json();
+      throw new Error(body.error?.message ?? 'Breakdown failed');
+    }
+    await fetchAssignments();
+  }
+
+  return {
+    assignments,
+    loading,
+    error,
+    createAssignment,
+    updateStatus,
+    requestBreakdown,
+    refetch: fetchAssignments,
+  };
+}
+
+
+// ============================================
+// hooks/useLearningItems.ts
+// ============================================
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import type { CardItem } from '@/components/kanban/Board';
+
+export function useLearningItems() {
+  const supabase = createClient();
+  const [items, setItems] = useState<CardItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('learning_items')
+      .select('id, title, status')
+      .order('created_at', { ascending: true });
+
+    if (error) setError(error.message);
+    else setItems(data ?? []);
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  async function createItem(title: string, source?: string) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('learning_items')
+      .insert({ title, source, status: 'want_to_learn', user_id: user.id })
+      .select()
+      .single();
+
+    if (error) throw error;
+    setItems((prev) => [...prev, data]);
+    return data;
+  }
+
+  async function updateStatus(id: string, status: string) {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
+    const { error } = await supabase.from('learning_items').update({ status }).eq('id', id);
+    if (error) {
+      setError(error.message);
+      fetchItems();
+    }
+  }
+
+  return { items, loading, error, createItem, updateStatus, refetch: fetchItems };
+}
+
+
+// ============================================
+// Example usage — app/(app)/courses/[id]/page.tsx
+// ============================================
+'use client';
+
+import { useAssignments } from '@/hooks/useAssignments';
+import { Board } from '@/components/kanban/Board';
+
+export default function CourseBoardPage({ params }: { params: { id: string } }) {
+  const { assignments, loading, error, updateStatus, requestBreakdown } =
+    useAssignments(params.id);
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading board…</p>;
+  if (error) return <p className="text-sm text-red-600">{error}</p>;
+
+  return (
+    <div>
+      <h1 className="text-lg font-semibold mb-4">Assignments</h1>
+      <Board items={assignments} onStatusChange={updateStatus} />
+      {/* Wire a "Break down" button on each card to call requestBreakdown(card.id) */}
+    </div>
+  );
+}

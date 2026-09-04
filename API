@@ -1,0 +1,55 @@
+# StudyForge REST API
+
+GET    /assignments/:id                  Get one assignment
+PATCH  /assignments/:id                  Update (status, title, due_date, etc.)
+DELETE /assignments/:id
+PATCH  /assignments/:id/status           Move between Kanban columns (drag-and-drop)
+
+POST   /assignments/:id/breakdown        AI: split assignment into subtasks + time estimates
+```
+
+## AI Tutor
+```
+POST   /courses/:id/tutor/messages       Send a message to the course-scoped tutor
+GET    /courses/:id/tutor/messages       Get chat history
+```
+
+## Skills & Learning Items (Growth Mode)
+```
+GET    /skills                           List user's skills
+POST   /skills                           Add a skill
+
+GET    /learning-items                   List learning items (Kanban board data)
+POST   /learning-items                   Create learning item
+GET    /learning-items/:id
+PATCH  /learning-items/:id               Update (status, link to skill/assignment)
+DELETE /learning-items/:id
+PATCH  /learning-items/:id/status        Move between Kanban columns
+```
+
+## Career Goals & Roadmap
+```
+GET    /career-goals                     List saved goals
+POST   /career-goals                     Create goal from a job posting
+
+POST   /career-goals/:id/analyze         AI: compare goal vs. current skills → gap analysis
+GET    /career-goals/:id/roadmap         Get generated roadmap
+POST   /career-goals/:id/roadmap/regen   Regenerate roadmap
+```
+
+## Weekly Summaries
+```
+GET    /summaries                        List past weekly summaries
+GET    /summaries/latest                 Most recent AI-generated summary
+POST   /summaries/generate               Manually trigger generation (else runs on a cron)
+```
+
+---
+
+## Conventions
+
+- **Auth**: all routes except `/auth/signup` and `/auth/login` require `Authorization: Bearer <token>`.
+- **Pagination**: list endpoints accept `?page=1&limit=20`, return `{ data, page, total }`.
+- **Errors**: `{ error: { code, message } }` with standard HTTP status codes (400/401/403/404/422/500).
+- **Status fields**: `assignments.status` ∈ `todo | in_progress | review | done`; `learning-items.status` ∈ `want_to_learn | learning | practicing | mastered`.
+- **AI endpoints** (`/breakdown`, `/tutor/messages`, `/analyze`, `/roadmap`, `/summaries/generate`) are async-friendly — consider returning a `202 Accepted` with a job id if generation takes >2–3s, and a `GET /jobs/:id` for polling.

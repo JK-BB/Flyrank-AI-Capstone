@@ -1,0 +1,303 @@
+// ============================================
+// lib/supabase/client.ts — browser client
+// ============================================
+import { createBrowserClient } from '@supabase/ssr';
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+
+
+// ============================================
+// lib/supabase/server.ts — server client (RSC/route handlers)
+// ============================================
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+
+export function createClient() {
+  const cookieStore = cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options) {
+          cookieStore.set({ name, value, ...options });
+        },
+        remove(name: string, options) {
+          cookieStore.set({ name, value: '', ...options });
+        },
+      },
+    }
+  );
+}
+
+
+// ============================================
+// middleware.ts — refresh session + protect /(app) routes
+// ============================================
+import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options) {
+          response.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options) {
+          response.cookies.set({ name, value: '', ...options });
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const isAppRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
+    request.nextUrl.pathname.startsWith('/courses') ||
+    request.nextUrl.pathname.startsWith('/growth') ||
+    request.nextUrl.pathname.startsWith('/settings');
+
+  if (isAppRoute && !user) {
+    const redirectUrl = new URL('/login', request.url);
+    redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  return response;
+}
+
+export const config = {
+  matcher: ['/dashboard/:path*', '/courses/:path*', '/growth/:path*', '/settings/:path*'],
+};
+
+
+// ============================================
+// app/(auth)/login/page.tsx
+// ============================================
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    router.push('/dashboard');
+    router.refresh();
+  }
+
+  return (
+    <div className="mx-auto mt-24 max-w-sm">
+      <h1 className="text-xl font-semibold mb-6">Log in to StudyForge</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Email</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Password</label>
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          />
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-md bg-black text-white py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {loading ? 'Logging in…' : 'Log in'}
+        </button>
+      </form>
+      <p className="text-sm text-muted-foreground mt-4">
+        No account? <a href="/signup" className="underline">Sign up</a>
+      </p>
+    </div>
+  );
+}
+
+
+// ============================================
+// app/(auth)/signup/page.tsx
+// ============================================
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+
+export default function SignupPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [checkEmail, setCheckEmail] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${location.origin}/dashboard` },
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setCheckEmail(true);
+  }
+
+  if (checkEmail) {
+    return (
+      <div className="mx-auto mt-24 max-w-sm text-center">
+        <h1 className="text-xl font-semibold mb-2">Check your email</h1>
+        <p className="text-sm text-muted-foreground">
+          We sent a confirmation link to {email}.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto mt-24 max-w-sm">
+      <h1 className="text-xl font-semibold mb-6">Create your account</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Email</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Password</label>
+          <input
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          />
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-md bg-black text-white py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {loading ? 'Creating account…' : 'Sign up'}
+        </button>
+      </form>
+      <p className="text-sm text-muted-foreground mt-4">
+        Already have an account? <a href="/login" className="underline">Log in</a>
+      </p>
+    </div>
+  );
+}
+
+
+// ============================================
+// app/(app)/layout.tsx — protected layout wrapper
+// (middleware already redirects unauthenticated users away from
+// these routes; this layout fetches the user for use in the UI,
+// e.g. showing their email in the navbar)
+// ============================================
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  return (
+    <div className="min-h-screen">
+      {/* Navbar/Sidebar go here, can read user.email */}
+      <main className="p-6">{children}</main>
+    </div>
+  );
+}
+
+
+// ============================================
+// app/api/auth/logout/route.ts
+// ============================================
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+
+export async function POST() {
+  const supabase = createClient();
+  await supabase.auth.signOut();
+  return NextResponse.json({ success: true });
+}

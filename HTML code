@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyForge — Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --paper: #FAF6EE;
+    --ink: #1F3A3D;
+    --ink-soft: #52696B;
+    --line: #DDD4C0;
+    --amber: #C8862B;
+    --amber-soft: #F3E3C8;
+    --sage: #7C9885;
+    --sage-soft: #E4EBE3;
+    --card: #FFFFFF;
+    --radius: 3px;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, .brand{
+    font-family: 'Source Serif 4', serif;
+  }
+
+  a{ color: inherit; }
+
+  .shell{
+    display:grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    border-right: 1px solid var(--line);
+    padding: 28px 22px;
+    display:flex;
+    flex-direction:column;
+    gap: 36px;
+  }
+
+  .brand{
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .brand span{ color: var(--amber); }
+
+  .nav-group-label{
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+
+  .nav-list{
+    list-style:none;
+    margin:0 0 24px 0;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+
+  .nav-list a{
+    display:block;
+    text-decoration:none;
+    font-size: 14px;
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    color: var(--ink-soft);
+  }
+
+  .nav-list a.active{
+    background: var(--sage-soft);
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .nav-list a:hover:not(.active){
+    background: rgba(0,0,0,0.03);
+  }
+
+  .sidebar-footer{
+    margin-top:auto;
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  /* ---------- Main ---------- */
+  main{
+    padding: 40px 48px 60px;
+  }
+
+  .page-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+  }
+
+  .page-head h1{
+    font-size: 30px;
+    font-weight: 600;
+    margin: 0 0 6px;
+  }
+
+  .page-head p{
+    margin:0;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  .today{
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align:right;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: 1.2fr 1fr 1.1fr;
+    gap: 20px;
+    align-items:start;
+  }
+
+  .card{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px;
+  }
+
+  .card h2{
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+
+  .card .sub{
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+  }
+
+  /* Deadlines */
+  .deadline-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+    gap: 12px;
+  }
+  .deadline-row:first-of-type{ border-top:none; padding-top:0; }
+
+  .deadline-title{
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0 0 2px;
+  }
+  .deadline-course{
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin:0;
+  }
+
+  .pill{
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill.urgent{ background: #F5DCD3; color: #9C4A2E; }
+  .pill.normal{ background: var(--sage-soft); color: #4C6B54; }
+
+  /* Learning */
+  .learn-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding: 11px 0;
+    border-top: 1px solid var(--line);
+  }
+  .learn-row:first-of-type{ border-top:none; padding-top:0; }
+
+  .learn-title{ font-size: 14px; }
+
+  .status-tag{
+    font-size: 11.5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--amber-soft);
+    color: #8A5A16;
+  }
+  .status-tag.practicing{
+    background: var(--sage-soft);
+    color: #4C6B54;
+  }
+
+  /* Weekly summary */
+  .summary-card{
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+  }
+  .summary-card h2{ color: var(--paper); }
+  .summary-card .sub{ color: #A9BFC0; }
+  .summary-card p.body{
+    font-size: 14.5px;
+    line-height: 1.6;
+    margin: 0 0 16px;
+  }
+  .summary-card ul{
+    margin:0;
+    padding:0;
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .summary-card li{
+    font-size: 13px;
+    color: #D7E2DC;
+    padding-left: 14px;
+    position:relative;
+  }
+  .summary-card li::before{
+    content:"";
+    position:absolute;
+    left:0; top:7px;
+    width:5px; height:5px;
+    background: var(--amber);
+    border-radius:50%;
+  }
+
+  .empty{
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  @media (max-width: 900px){
+    .shell{ grid-template-columns: 1fr; }
+    .sidebar{ display:none; }
+    .grid{ grid-template-columns: 1fr; }
+    main{ padding: 28px 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brand">Study<span>Forge</span></div>
+
+    <div>
+      <p class="nav-group-label">Overview</p>
+      <ul class="nav-list">
+        <li><a href="#" class="active">Dashboard</a></li>
+      </ul>
+
+      <p class="nav-group-label">Course Mode</p>
+      <ul class="nav-list">
+        <li><a href="#">Courses</a></li>
+        <li><a href="#">AI Tutor</a></li>
+      </ul>
+
+      <p class="nav-group-label">Growth Mode</p>
+      <ul class="nav-list">
+        <li><a href="#">Learning Board</a></li>
+        <li><a href="#">Roadmap</a></li>
+        <li><a href="#">Skills</a></li>
+      </ul>
+    </div>
+
+    <div class="sidebar-footer">Alyssa Merjilla<br>alyssa@studyforge.dev</div>
+  </aside>
+
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Dashboard</h1>
+        <p>Everything due, everything you're building — one place.</p>
+      </div>
+      <div class="today">Friday, September 4</div>
+    </div>
+
+    <div class="grid">
+
+      <!-- Deadlines -->
+      <section class="card">
+        <h2>Upcoming Deadlines</h2>
+        <p class="sub">Across all courses</p>
+
+        <div class="deadline-row">
+          <div>
+            <p class="deadline-title">Database Design Proposal</p>
+            <p class="deadline-course">CS 340 — Databases</p>
+          </div>
+          <span class="pill urgent">Today</span>
+        </div>
+
+        <div class="deadline-row">
+          <div>
+            <p class="deadline-title">Problem Set 6</p>
+            <p class="deadline-course">MATH 221 — Linear Algebra</p>
+          </div>
+          <span class="pill urgent">2d</span>
+        </div>
+
+        <div class="deadline-row">
+          <div>
+            <p class="deadline-title">Group Presentation Slides</p>
+            <p class="deadline-course">BUS 210 — Marketing</p>
+          </div>
+          <span class="pill normal">5d</span>
+        </div>
+
+        <div class="deadline-row">
+          <div>
+            <p class="deadline-title">Reading Response #4</p>
+            <p class="deadline-course">ENGL 150 — Rhetoric</p>
+          </div>
+          <span class="pill normal">6d</span>
+        </div>
+      </section>
+
+      <!-- Active learning -->
+      <section class="card">
+        <h2>Active Learning</h2>
+        <p class="sub">Growth Mode</p>
+
+        <div class="learn-row">
+          <span class="learn-title">TypeScript generics</span>
+          <span class="status-tag">Learning</span>
+        </div>
+        <div class="learn-row">
+          <span class="learn-title">SQL query optimization</span>
+          <span class="status-tag practicing">Practicing</span>
+        </div>
+        <div class="learn-row">
+          <span class="learn-title">System design basics</span>
+          <span class="status-tag">Learning</span>
+        </div>
+        <div class="learn-row">
+          <span class="learn-title">Behavioral interview prep</span>
+          <span class="status-tag practicing">Practicing</span>
+        </div>
+      </section>
+
+      <!-- Weekly summary -->
+      <section class="card summary-card">
+        <h2>This Week</h2>
+        <p class="sub">Generated Sunday night</p>
+        <p class="body">You cleared three assignments and moved SQL optimization into practice — good pace heading into midterms. Linear Algebra is the one to watch this week.</p>
+        <ul>
+          <li>Finished the Databases ER-diagram assignment</li>
+          <li>Mastered "joins vs. subqueries"</li>
+          <li>2 deadlines land within 2 days — plan for those first</li>
+        </ul>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>
